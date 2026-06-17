@@ -55,6 +55,7 @@ pipeline {
                         }
                     }
                 }
+
                 stage('Test') {
                     steps {
                         dir(env.SERVICE_DIR) {
