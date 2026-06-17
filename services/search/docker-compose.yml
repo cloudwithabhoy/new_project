@@ -1,0 +1,70 @@
+# Local development only — NOT used in Kubernetes.
+# Spins up single-node Elasticsearch + catalog (with its own Postgres) + search, so
+# you can reindex from a real catalog and run queries end to end.
+#
+#   docker compose up --build
+#   # seed a product in the catalog:
+#   curl -X POST localhost:8083/products \
+#     -H 'Content-Type: application/json' \
+#     -d '{"name":"Red Shoes","description":"comfy running shoes","price_cents":4999,"stock":10}'
+#   # pull catalog -> ES, then search:
+#   curl -X POST localhost:8084/reindex
+#   curl 'localhost:8084/search?q=shoes'
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.14.0
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  catalog-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: catalog
+      POSTGRES_DB: catalog
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  catalog:
+    build: ../catalog
+    environment:
+      PORT: "8083"
+      LOG_LEVEL: info
+      DB_HOST: catalog-db
+      DB_PORT: "5432"
+      DB_USER: catalog
+      DB_PASSWORD: catalog
+      DB_NAME: catalog
+      DB_SSLMODE: disable
+    ports:
+      - "8083:8083"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+
+  search:
+    build: .
+    environment:
+      PORT: "8084"
+      LOG_LEVEL: info
+      ELASTICSEARCH_URL: http://elasticsearch:9200
+      CATALOG_URL: http://catalog:8083
+    ports:
+      - "8084:8084"
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      catalog:
+        condition: service_started

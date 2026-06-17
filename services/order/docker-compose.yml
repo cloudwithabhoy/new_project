@@ -1,0 +1,80 @@
+# Local development only — NOT used in Kubernetes.
+# Brings up Postgres + Redpanda (Kafka API) + the order service so you can boot
+# the orchestrator and exercise its DB + Kafka wiring locally.
+#
+#   docker compose up --build
+#
+# PRAGMATIC NOTE: order is the ORCHESTRATOR. A *full* POST /orders also needs
+# cart (:8085), payment (:8087), and inventory (:8088) running. This compose file
+# only stands up order + its own datastores so you can verify it BOOTS, serves
+# /healthz, /readyz (DB + Kafka writer), and lists/reads orders. To drive a real
+# checkout end-to-end, also run cart/payment/inventory (point CART_URL /
+# PAYMENT_URL / INVENTORY_URL at them — e.g. host.docker.internal) and seed a cart.
+services:
+  order-postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: order
+      POSTGRES_PASSWORD: order
+      POSTGRES_DB: order
+    ports:
+      - "5436:5432"
+    volumes:
+      - order_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Redpanda speaks the Kafka API and is lighter than full Kafka for local dev.
+  redpanda:
+    image: redpandadata/redpanda:v24.1.7
+    command:
+      - redpanda
+      - start
+      - --smp=1
+      - --memory=512M
+      - --overprovisioned
+      - --node-id=0
+      - --check=false
+      - --kafka-addr=PLAINTEXT://0.0.0.0:9092
+      - --advertise-kafka-addr=PLAINTEXT://redpanda:9092
+    ports:
+      - "9092:9092"
+    healthcheck:
+      test: ["CMD-SHELL", "rpk cluster health | grep -q 'Healthy:.*true'"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  order:
+    build: .
+    environment:
+      PORT: "8086"
+      LOG_LEVEL: info
+      DB_HOST: order-postgres
+      DB_PORT: "5432"
+      DB_USER: order
+      DB_PASSWORD: order
+      DB_NAME: order
+      DB_SSLMODE: disable
+      # Downstream URLs: point these at real cart/payment/inventory for a full
+      # checkout. Defaults below are placeholders that won't resolve in-compose.
+      CART_URL: http://host.docker.internal:8085
+      PAYMENT_URL: http://host.docker.internal:8087
+      INVENTORY_URL: http://host.docker.internal:8088
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_TOPIC: order.created
+    ports:
+      - "8086:8086"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      order-postgres:
+        condition: service_healthy
+      redpanda:
+        condition: service_healthy
+
+volumes:
+  order_pgdata:

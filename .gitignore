@@ -1,0 +1,29 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.venv/
+venv/
+
+# --- Go ---
+# compiled binaries / test artifacts (images are built in Docker, not committed)
+*.exe
+*.out
+bin/
+vendor/
+
+# --- Node ---
+node_modules/
+npm-debug.log*
+package-lock.json.bak
+
+# --- Editors / OS ---
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# --- Logs / local ---
+*.log
+.env

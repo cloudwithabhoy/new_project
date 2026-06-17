@@ -1,0 +1,91 @@
+// Jenkinsfile — recommendation (Python microservice) · monorepo, path-triggered
+//
+// One Jenkins "Pipeline" job per service: SCM = this repo, branch = main,
+// Script Path = services/recommendation/Jenkinsfile.
+// The CI stage only runs when services/recommendation/** changed (or you click "Build Now").
+//
+// Prereqs: Docker on the agent · plugins "Docker Pipeline" + "Amazon ECR" ·
+//          a Jenkins AWS credential (ID = ECR_CREDENTIALS_ID) or an IAM role on the agent.
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        AWS_REGION         = 'ap-south-1'
+        AWS_ACCOUNT        = '169424082295'
+        ECR_REGISTRY       = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REPOSITORY     = 'ecom-repo'
+        SERVICE            = 'recommendation'
+        SERVICE_DIR        = 'services/recommendation'
+        IMAGE              = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
+        ECR_CREDENTIALS_ID = 'aws-ecr'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script { env.IMAGE_TAG = "${SERVICE}-" + (env.GIT_COMMIT ?: 'dev').take(7) }
+                echo "Target image: ${IMAGE}:${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('CI') {
+            when { anyOf { changeset "services/recommendation/**"; triggeredBy 'UserIdCause' } }
+            stages {
+                stage('Lint') {
+                    steps {
+                        dir(env.SERVICE_DIR) {
+                            sh '''
+                                docker run --rm -v "$PWD":/w -w /w python:3.12-slim sh -c '
+                                  pip install --quiet --root-user-action=ignore ruff || true
+                                  ruff check . || echo "WARN ruff reported issues"
+                                  python -m compileall -q .
+                                '
+                            '''
+                        }
+                    }
+                }
+                stage('Test') {
+                    steps {
+                        dir(env.SERVICE_DIR) {
+                            // pytest runs only if a tests/ dir exists (none yet) — add tests over time.
+                            sh '''
+                                if [ -d tests ]; then
+                                  docker run --rm -v "$PWD":/w -w /w python:3.12-slim sh -c '
+                                    pip install --quiet --root-user-action=ignore -r requirements.txt pytest && pytest -q
+                                  '
+                                else
+                                  echo "No tests/ directory yet — skipping."
+                                fi
+                            '''
+                        }
+                    }
+                }
+                stage('Build & Push') {
+                    steps {
+                        script {
+                            def image = docker.build("${IMAGE}:${env.IMAGE_TAG}", env.SERVICE_DIR)
+                            docker.withRegistry("https://${ECR_REGISTRY}", "ecr:${AWS_REGION}:${ECR_CREDENTIALS_ID}") {
+                                image.push(env.IMAGE_TAG)
+                                image.push("${SERVICE}-latest")
+                            }
+                            echo "Pushed ${IMAGE}:${env.IMAGE_TAG}"
+                            echo "Deploy:  kubectl -n shop set image deploy/${SERVICE} ${SERVICE}=${IMAGE}:${env.IMAGE_TAG}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always { sh 'docker image prune -f >/dev/null 2>&1 || true' }
+    }
+}

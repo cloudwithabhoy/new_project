@@ -1,0 +1,45 @@
+# Local development only — NOT used in Kubernetes.
+# Spins up Postgres + the user service so you can test it in isolation.
+# (To exercise the auth -> user flow together, use services/auth/docker-compose.yml.)
+#
+#   docker compose up --build
+#   curl localhost:8082/healthz
+#   curl -X POST localhost:8082/users \
+#     -H 'Content-Type: application/json' \
+#     -d '{"email":"ada@example.com","full_name":"Ada Lovelace"}'
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user_svc
+      POSTGRES_PASSWORD: user_svc
+      POSTGRES_DB: users
+    ports:
+      - "5434:5432"
+    volumes:
+      - user_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_svc"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  user:
+    build: .
+    environment:
+      PORT: "8082"
+      LOG_LEVEL: info
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: user_svc
+      DB_PASSWORD: user_svc
+      DB_NAME: users
+      DB_SSLMODE: disable
+    ports:
+      - "8082:8082"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  user_pgdata:

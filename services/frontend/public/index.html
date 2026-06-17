@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shop — EKS Microservices Demo</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>🛒 Shop</h1>
+      <div class="session">
+        <span id="whoami">not signed in</span>
+        <button id="logout-btn" class="link" hidden>logout</button>
+      </div>
+    </header>
+
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+
+    <main>
+      <!-- Auth -->
+      <section id="auth-section" class="card">
+        <h2>Account</h2>
+        <div class="row">
+          <input id="email" type="email" placeholder="email" autocomplete="email" />
+          <input id="password" type="password" placeholder="password" autocomplete="current-password" />
+          <input id="fullname" type="text" placeholder="full name (register)" autocomplete="name" />
+        </div>
+        <div class="row">
+          <button id="register-btn">Register</button>
+          <button id="login-btn">Login</button>
+        </div>
+      </section>
+
+      <!-- Products -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Products</h2>
+          <button id="refresh-products" class="link">refresh</button>
+        </div>
+        <ul id="products" class="list"></ul>
+      </section>
+
+      <!-- Cart -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Cart</h2>
+          <button id="refresh-cart" class="link">refresh</button>
+        </div>
+        <ul id="cart" class="list"></ul>
+        <div class="row">
+          <strong>Total: <span id="cart-total">—</span></strong>
+          <button id="checkout-btn">Checkout</button>
+        </div>
+      </section>
+
+      <!-- Orders -->
+      <section class="card">
+        <div class="card-head">
+          <h2>Orders</h2>
+          <button id="refresh-orders" class="link">refresh</button>
+        </div>
+        <ul id="orders" class="list"></ul>
+      </section>
+    </main>
+
+    <footer>
+      <small>Gateway: <code id="gateway-url">…</code></small>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

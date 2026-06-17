@@ -1,0 +1,17 @@
+{
+  "name": "frontend",
+  "version": "1.0.0",
+  "description": "Static single-page UI for the EKS microservices demo, served by Express and talking to the api-gateway from the browser.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check server.js"
+  },
+  "dependencies": {
+    "express": "4.21.2",
+    "prom-client": "15.1.3"
+  }
+}

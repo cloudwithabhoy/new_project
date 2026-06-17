@@ -1,0 +1,7 @@
+# Keep the build context small and clean
+.env
+.git
+*.md
+docker-compose.yml
+bin/
+tmp/

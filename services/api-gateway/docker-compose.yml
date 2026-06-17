@@ -1,0 +1,42 @@
+# Local development only — NOT used in Kubernetes.
+#
+# This compose file brings up ONLY the api-gateway. The gateway is an edge
+# reverse proxy with no datastore of its own; it needs the UPSTREAM services
+# running and reachable at the *_URL addresses below to actually serve traffic.
+#
+# Two ways to run locally:
+#   1) Start the upstreams first (each service's own `docker compose up`), then
+#      point the *_URL vars at them. With default host networking that usually
+#      means host.docker.internal (already set below) so the gateway container
+#      can reach services published on your host.
+#   2) Or attach this to a shared compose network where auth/user/catalog/... run
+#      as services, and set the *_URL vars to their service names (e.g.
+#      http://auth:8081). The gateway readiness probe needs AUTH_URL reachable.
+#
+#   docker compose up --build
+#   # then, after logging in via the auth service to get a JWT:
+#   curl localhost:8080/api/products            # public, proxied to catalog
+#   curl -H "Authorization: Bearer $JWT" \
+#        localhost:8080/api/cart/carts/42        # protected, proxied to cart
+services:
+  api-gateway:
+    build: .
+    environment:
+      PORT: "8080"
+      LOG_LEVEL: info
+      # host.docker.internal lets the container reach services published on the
+      # host. Swap these for k8s Service names in-cluster (no hardcoding there).
+      AUTH_URL: http://host.docker.internal:8081
+      USER_URL: http://host.docker.internal:8082
+      CATALOG_URL: http://host.docker.internal:8083
+      SEARCH_URL: http://host.docker.internal:8084
+      CART_URL: http://host.docker.internal:8085
+      ORDER_URL: http://host.docker.internal:8086
+      RECOMMENDATION_URL: http://host.docker.internal:8090
+      JWT_ISSUER: auth.ecommerce.local
+      JWT_AUDIENCE: ecommerce
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      # Makes host.docker.internal resolve on Linux Docker too.
+      - "host.docker.internal:host-gateway"
