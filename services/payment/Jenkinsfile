@@ -1,0 +1,90 @@
+// Jenkinsfile — payment (Go microservice) · monorepo, path-triggered
+//
+// One Jenkins "Pipeline" job per service: SCM = this repo, branch = main,
+// Script Path = services/payment/Jenkinsfile.
+// The CI stage only runs when services/payment/** changed (or you click "Build Now"),
+// so a push touching another service is a fast no-op here.
+//
+// Prereqs: Docker on the agent · plugins "Docker Pipeline" + "Amazon ECR" ·
+//          a Jenkins AWS credential (ID = ECR_CREDENTIALS_ID) or an IAM role on the agent.
+
+pipeline {
+    agent any
+
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '20'))
+    }
+
+    environment {
+        AWS_REGION         = 'ap-south-1'
+        AWS_ACCOUNT        = '169424082295'
+        ECR_REGISTRY       = "${AWS_ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com"
+        ECR_REPOSITORY     = 'ecom-repo'                       // shared repo; service encoded in the tag
+        SERVICE            = 'payment'
+        SERVICE_DIR        = 'services/payment'
+        IMAGE              = "${ECR_REGISTRY}/${ECR_REPOSITORY}"
+        ECR_CREDENTIALS_ID = 'aws-ecr'
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+                script { env.IMAGE_TAG = "${SERVICE}-" + (env.GIT_COMMIT ?: 'dev').take(7) }
+                echo "Target image: ${IMAGE}:${env.IMAGE_TAG}"
+            }
+        }
+
+        stage('CI') {
+            when { anyOf { changeset "services/payment/**"; triggeredBy 'UserIdCause' } }
+            stages {
+                stage('Lint') {
+                    steps {
+                        dir(env.SERVICE_DIR) {
+                            sh '''
+                                docker run --rm -v "$PWD":/w -w /w \
+                                  -e GOFLAGS=-mod=mod -e GOSUMDB=off \
+                                  golang:1.23-alpine sh -c '
+                                    gofmt -l . > /tmp/fmt.txt 2>/dev/null || true
+                                    if [ -s /tmp/fmt.txt ]; then echo "WARN gofmt suggests:"; cat /tmp/fmt.txt; fi
+                                    go vet ./...
+                                  '
+                            '''
+                        }
+                    }
+                }
+                stage('Test') {
+                    steps {
+                        dir(env.SERVICE_DIR) {
+                            // go test passes cleanly when there are no _test.go files yet.
+                            sh '''
+                                docker run --rm -v "$PWD":/w -w /w \
+                                  -e GOFLAGS=-mod=mod -e GOSUMDB=off \
+                                  golang:1.23-alpine go test ./...
+                            '''
+                        }
+                    }
+                }
+                stage('Build & Push') {
+                    steps {
+                        script {
+                            def image = docker.build("${IMAGE}:${env.IMAGE_TAG}", env.SERVICE_DIR)
+                            docker.withRegistry("https://${ECR_REGISTRY}", "ecr:${AWS_REGION}:${ECR_CREDENTIALS_ID}") {
+                                image.push(env.IMAGE_TAG)
+                                image.push("${SERVICE}-latest")
+                            }
+                            echo "Pushed ${IMAGE}:${env.IMAGE_TAG}"
+                            echo "Deploy:  kubectl -n shop set image deploy/${SERVICE} ${SERVICE}=${IMAGE}:${env.IMAGE_TAG}"
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        always { sh 'docker image prune -f >/dev/null 2>&1 || true' }
+    }
+}
