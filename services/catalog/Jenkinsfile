@@ -73,7 +73,6 @@ pipeline {
                             def image = docker.build("${IMAGE}:${env.IMAGE_TAG}", env.SERVICE_DIR)
                             docker.withRegistry("https://${ECR_REGISTRY}", "ecr:${AWS_REGION}:${ECR_CREDENTIALS_ID}") {
                                 image.push(env.IMAGE_TAG)
-                                image.push("${SERVICE}-latest")
                             }
                             echo "Pushed ${IMAGE}:${env.IMAGE_TAG}"
                             echo "Deploy:  kubectl -n shop set image deploy/${SERVICE} ${SERVICE}=${IMAGE}:${env.IMAGE_TAG}"
