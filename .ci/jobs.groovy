@@ -10,7 +10,7 @@
 // ---- configuration ----
 def repo        = 'https://github.com/cloudwithabhoy/new_project.git'
 def gitCredsId  = 'git-cred'     // Jenkins credential ID for cloning the repo
-def branch      = '*/main'
+def gitBranch   = '*/main'
 
 def services = [
     'api-gateway',
@@ -57,7 +57,7 @@ services.each { svc ->
                             url(repo)
                             credentials(gitCredsId)
                         }
-                        branch(branch)
+                        branch(gitBranch)
                     }
                 }
                 scriptPath("services/${svc}/Jenkinsfile")
