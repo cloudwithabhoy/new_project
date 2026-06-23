@@ -105,7 +105,7 @@ See [`.env.example`](./.env.example).
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8088` (HTTP). The Kafka consumer needs **no** inbound port (it dials out).
 - **Image:** build from this dir; push to ECR as `…/inventory:<git-sha>`

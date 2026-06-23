@@ -139,7 +139,7 @@ See [`.env.example`](./.env.example). The gateway has **no secrets**.
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8080` (HTTP), edge service.
 - **Image:** build from this dir; push to ECR as `…/api-gateway:<git-sha>`.

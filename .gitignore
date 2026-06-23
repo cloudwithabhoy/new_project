@@ -27,3 +27,6 @@ package-lock.json.bak
 # --- Logs / local ---
 *.log
 .env
+
+# --- Personal (not pushed) ---
+project_tracker.md

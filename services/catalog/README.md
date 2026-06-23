@@ -63,7 +63,7 @@ All config is via env vars. See [`.env.example`](./.env.example).
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 Everything you need to write the Kubernetes manifests, in one place:
 

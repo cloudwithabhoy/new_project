@@ -96,7 +96,7 @@ RED (HTTP) per `services/api-details.md` §1.3, plus the async-worker series:
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8089` (HTTP — ops + inspection only; **no business traffic**)
 - **Image:** build from this dir; push to ECR as `…/notification:<git-sha>`
@@ -113,7 +113,7 @@ RED (HTTP) per `services/api-details.md` §1.3, plus the async-worker series:
 - **Resource hints (tune later):** requests `cpu: 50m, memory: 96Mi` · limits `cpu: 250m, memory: 192Mi`.
 - **Security:** runs as **non-root** (uid 10001); filesystem can be read-only.
 
-### ⚡ KEDA scale-to-zero (this service's headline DevOps feature)
+### KEDA scale-to-zero (this service's headline DevOps feature)
 
 Stateless + no DB + pure Kafka consumer → ideal for **KEDA's `kafka` scaler** on
 **consumer-group lag**. Sketch a `ScaledObject` targeting this Deployment:

@@ -17,7 +17,9 @@
       "Bash(python3 -)",
       "Bash(python3 -c \"import zipfile; z=zipfile.ZipFile\\('elasticsearch-8.14.0-py3-none-any.whl'\\); src=z.read\\('elasticsearch/helpers/__init__.py'\\).decode\\(\\); import re; [print\\(l\\) for l in src.splitlines\\(\\) if 'async_bulk' in l or 'import' in l][:0]; print\\('\\\\n'.join\\(l for l in src.splitlines\\(\\) if 'async' in l.lower\\(\\)\\)[:600]\\)\")",
       "Bash(pkill -f 'go build')",
-      "Bash(pkill -f 'b8jzm7jxz')"
+      "Bash(pkill -f 'b8jzm7jxz')",
+      "Bash(ssh *)",
+      "Bash(aws ec2 *)"
     ]
   }
 }

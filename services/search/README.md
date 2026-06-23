@@ -73,7 +73,7 @@ This service has **no secrets of its own** (local-dev ES runs with security disa
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8084` (HTTP)
 - **Image:** build from this dir; push to ECR as `…/search:<git-sha>`

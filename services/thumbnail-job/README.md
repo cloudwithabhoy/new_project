@@ -71,7 +71,7 @@ Worker metrics (not RED HTTP metrics — this is an async consumer, api-details 
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `9100` (HTTP — `/healthz` + `/metrics` only; **no** business traffic).
 - **Image:** build from this dir; push to ECR as `…/thumbnail-job:<git-sha>`.

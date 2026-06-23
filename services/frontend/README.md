@@ -71,7 +71,7 @@ See [`.env.example`](./.env.example). **No secrets.**
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `3000` (HTTP)
 - **Image:** build from this dir; push to ECR as `…/frontend:<git-sha>`
@@ -81,7 +81,7 @@ See [`.env.example`](./.env.example). **No secrets.**
 - **ConfigMap keys:** `PORT`, `LOG_LEVEL`, `API_GATEWAY_URL`
 - **Secret keys:** **none** — this service holds no secrets.
 - **Dependencies:** none at the server level (no DB). Functionally the **browser** needs the
-  **api-gateway** reachable at `API_GATEWAY_URL`. ⚠️ Set `API_GATEWAY_URL` to a **browser-reachable**
+  **api-gateway** reachable at `API_GATEWAY_URL`. Set `API_GATEWAY_URL` to a **browser-reachable**
   URL (the gateway's Ingress/public host), not `http://api-gateway:8080` (that only resolves
   in-cluster, the browser can't reach it).
 - **Service discovery:** this is the **edge UI**; nothing in the mesh calls it. Expose it via

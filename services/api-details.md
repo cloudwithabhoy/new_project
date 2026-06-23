@@ -34,7 +34,7 @@ Reference implementations to copy style from:
 8. **Dockerfile**: multi-stage, small image, **non-root**. Go → `distroless/static-debian12:nonroot`
    (reuse `auth`'s Dockerfile incl. the `-mod=mod` retry loop). Python → `python:3.12-slim` non-root
    (reuse `user`'s Dockerfile). Node → `node:20-slim` non-root.
-9. **Per-microservice deliverables:** source + `Dockerfile` + `README.md` (with a "📦 DevOps handoff"
+9. **Per-microservice deliverables:** source + `Dockerfile` + `README.md` (with a "DevOps handoff"
    section listing container port, probes, ConfigMap keys, Secret keys, dependencies, resource
    hints) + `.env.example` + `docker-compose.yml` (LOCAL dev only) + the microservice's
    config/secret key list.

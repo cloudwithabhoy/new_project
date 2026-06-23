@@ -95,7 +95,7 @@ See [`.env.example`](./.env.example).
 | `JWT_AUDIENCE` | `ecommerce` | no | `aud` claim |
 | `JWT_TTL_MINUTES` | `60` | no | Access-token lifetime |
 
-> ⚠️ **Always set `JWT_PRIVATE_KEY_PEM` in Kubernetes.** Without it the service generates an
+> **Always set `JWT_PRIVATE_KEY_PEM` in Kubernetes.** Without it the service generates an
 > ephemeral key on startup — tokens break on every restart and the JWKS changes. Generate one:
 > ```bash
 > openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out auth-jwt.pem
@@ -104,7 +104,7 @@ See [`.env.example`](./.env.example).
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8081` (HTTP)
 - **Image:** build from this dir; push to ECR as `…/auth:<git-sha>`

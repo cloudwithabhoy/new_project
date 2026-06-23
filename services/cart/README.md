@@ -104,7 +104,7 @@ See [`.env.example`](./.env.example).
 
 ---
 
-## 📦 DevOps handoff — what you need for the manifests
+## DevOps handoff — what you need for the manifests
 
 - **Container port:** `8085` (HTTP)
 - **Image:** build from this dir; push to ECR as `…/cart:<git-sha>`
