@@ -2,7 +2,7 @@
 //
 // Generates one "Pipeline" job per microservice, each pointed at its own
 // services/<svc>/Jenkinsfile on the main branch. Run this from a single SEED job
-// (see .ci/README-seed.md) — it creates/updates all 13 jobs in one shot.
+// (see .ci/README-seed.md) — it creates/updates all 6 jobs in one shot.
 //
 // Re-run it any time: it reconciles the jobs to match this script (add a service →
 // add it to the list below → re-run the seed job → the new job appears).
@@ -15,17 +15,10 @@ def gitBranch   = '*/main'
 def services = [
     'api-gateway',
     'auth',
-    'user',
     'catalog',
-    'search',
-    'cart',
     'order',
-    'payment',
     'inventory',
-    'notification',
-    'recommendation',
     'frontend',
-    'thumbnail-job',
 ]
 
 // ---- generate one pipeline job per service ----

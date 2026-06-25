@@ -1,2 +1,0 @@
-aiokafka==0.10.0
-prometheus-client==0.20.0

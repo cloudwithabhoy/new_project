@@ -21,7 +21,7 @@ previous one. This is the *one* place that sequences the work.
 | [01](./01-cicd-with-jenkins.md) | **CI/CD with Jenkins** | every image built + pushed to ECR (`ecom-repo:<svc>-<sha>`) |
 | [02](./02-one-eks-cluster.md) | **One EKS cluster** | an empty real cluster in `ap-south-1` (LB controller, Karpenter, namespaces) |
 | [03](./03-datastores-and-first-deploy.md) | **Datastores + first deploy** | StatefulSet datastores + `catalog` live end-to-end |
-| [04](./04-full-microservice-fleet.md) | **Full microservice fleet** | all 13 components + the Kafka async backbone |
+| [04](./04-full-microservice-fleet.md) | **Full microservice fleet** | all 6 microservices + the Kafka async backbone |
 | [05](./05-istio-service-mesh.md) | **Istio service mesh** | mTLS, Istio Gateway, traffic management, tracing |
 | [06](./06-reliability-and-autoscaling.md) | **Reliability & autoscaling** | HPA/KEDA/VPA/Karpenter, PDB, Velero |
 | [07](./07-observability-and-slos.md) | **Observability & SLOs** | Prometheus/Grafana/Loki/Tempo + SLOs + burn-rate alerts |
@@ -70,7 +70,7 @@ Prerequisites · Execution steps / What you build · Exit check · Interview one
 **Stack:** Go + Python + Node services · Postgres / Redis / Elasticsearch / Kafka · Istio · AWS EKS ·
 Amazon ECR · Karpenter · Jenkins · Prometheus/Thanos/Grafana/Loki/Tempo.
 
-**13 components** (all code-complete): `api-gateway` `auth` `user` `catalog` `search` `cart` `order`
+**6 microservices** (all code-complete): `api-gateway` `auth` `user` `catalog` `search` `cart` `order`
 `payment` `inventory` `notification` `recommendation` `frontend` + `thumbnail-job` (worker).
 Full detail: [`../APPLICATION-ARCHITECTURE.md`](../APPLICATION-ARCHITECTURE.md) ·
 [`../services/api-details.md`](../services/api-details.md).
@@ -89,7 +89,7 @@ Full detail: [`../APPLICATION-ARCHITECTURE.md`](../APPLICATION-ARCHITECTURE.md) 
 - Keep all manifests in Git so any region is one documented re-apply away.
 
 ## Definition of done
-- All 13 components running across **3 regions**, each in the Istio mesh with mTLS.
+- All 6 microservices running across **3 regions**, each in the Istio mesh with mTLS.
 - Every Kubernetes primitive hand-written and `kubectl apply`-ed yourself.
 - Global geo-routing + cross-region replication + a rehearsed DR game-day.
 - Autoscaling + PDBs proven; correlated metrics/logs/traces with SLOs + burn-rate alerts (Thanos global).

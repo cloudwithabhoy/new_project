@@ -18,12 +18,11 @@ const dbTimeout = 5 * time.Second
 type Handler struct {
 	store  *Store
 	signer *Signer
-	users  *UserClient
 }
 
 // NewRouter wires up all routes and middleware and returns the root handler.
-func NewRouter(store *Store, signer *Signer, users *UserClient) http.Handler {
-	h := &Handler{store: store, signer: signer, users: users}
+func NewRouter(store *Store, signer *Signer) http.Handler {
+	h := &Handler{store: store, signer: signer}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /register", withRoute("/register", h.register))
@@ -40,14 +39,9 @@ func NewRouter(store *Store, signer *Signer, users *UserClient) http.Handler {
 	return metricsMiddleware(loggingMiddleware(mux))
 }
 
-// register creates a login identity. It first asks the user service to create the
-// profile (the traced sync hop), then stores the credentials locally.
-//
-// NOTE (distributed-transaction caveat, a deliberate learning point): if the user
-// profile is created but the credential insert then fails, we can leak an orphan
-// profile. A real system would reconcile this with a saga / outbox / idempotency
-// key. We pre-check the email to make the common case clean and leave the edge
-// case documented rather than hidden.
+// register creates a login identity. In the trimmed build there is no separate
+// user service, so auth stores the credential and mints the user_id itself
+// (the DB BIGSERIAL), returning it to the caller.
 func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 	log := loggerFrom(r.Context())
 	in, ok := decodeRegister(w, r)
@@ -63,17 +57,6 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	profile, err := h.users.CreateUser(ctx, CreateUserRequest{Email: in.Email, FullName: in.FullName}, propagate(r))
-	if errors.Is(err, ErrUserConflict) {
-		writeError(w, http.StatusConflict, "email already registered")
-		return
-	}
-	if err != nil {
-		log.Error("user service create failed", "error", err)
-		writeError(w, http.StatusBadGateway, "user service unavailable")
-		return
-	}
-
 	hash, err := bcrypt.GenerateFromPassword([]byte(in.Password), bcrypt.DefaultCost)
 	if err != nil {
 		log.Error("hash password", "error", err)
@@ -81,18 +64,19 @@ func (h *Handler) register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.store.CreateCredential(ctx, profile.ID, in.Email, string(hash)); err != nil {
+	userID, err := h.store.CreateCredential(ctx, in.Email, string(hash))
+	if err != nil {
 		if errors.Is(err, ErrConflict) {
 			writeError(w, http.StatusConflict, "email already registered")
 			return
 		}
-		log.Error("create credential", "error", err, "user_id", profile.ID)
+		log.Error("create credential", "error", err)
 		writeError(w, http.StatusInternalServerError, "failed to register")
 		return
 	}
 
-	log.Info("user registered", "user_id", profile.ID)
-	writeJSON(w, http.StatusCreated, map[string]any{"user_id": profile.ID, "email": in.Email})
+	log.Info("user registered", "user_id", userID)
+	writeJSON(w, http.StatusCreated, map[string]any{"user_id": userID, "email": in.Email})
 }
 
 // login verifies the password and issues a signed JWT.

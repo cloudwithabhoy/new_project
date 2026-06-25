@@ -14,23 +14,21 @@ import (
 // dbTimeout bounds every database-backed request.
 const dbTimeout = 5 * time.Second
 
-// orchestrateTimeout bounds a whole checkout fan-out (cart -> payment ->
-// inventory -> persist -> emit). It must comfortably exceed the sum of the
-// per-client 5s timeouts plus the DB writes.
+// orchestrateTimeout bounds a whole checkout (inventory reserve -> persist ->
+// emit). It must comfortably exceed the inventory client's 5s timeout plus the
+// DB writes.
 const orchestrateTimeout = 25 * time.Second
 
 // Handler holds dependencies shared by all HTTP handlers.
 type Handler struct {
 	store     *Store
-	cart      *CartClient
-	payment   *PaymentClient
 	inventory *InventoryClient
 	producer  *Producer
 }
 
 // NewRouter wires up all routes and middleware and returns the root handler.
-func NewRouter(store *Store, cart *CartClient, payment *PaymentClient, inventory *InventoryClient, producer *Producer) http.Handler {
-	h := &Handler{store: store, cart: cart, payment: payment, inventory: inventory, producer: producer}
+func NewRouter(store *Store, inventory *InventoryClient, producer *Producer) http.Handler {
+	h := &Handler{store: store, inventory: inventory, producer: producer}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("POST /orders", withRoute("/orders", h.createOrder))
@@ -46,16 +44,15 @@ func NewRouter(store *Store, cart *CartClient, payment *PaymentClient, inventory
 	return metricsMiddleware(loggingMiddleware(mux))
 }
 
-// createOrder is the orchestration: the checkout saga per §3.
+// createOrder is the checkout. In the trimmed build there is no cart/payment
+// service, so the client submits the line items directly; order reserves
+// inventory, persists the order, and emits order.created:
 //
-//	1. GET cart (400 if empty)
-//	2. pre-allocate order_id, POST payment  (402 if declined)
-//	3. POST inventory/reserve               (409 passthrough)
-//	4. persist order (status "confirmed") + emit order.created
-//	5. best-effort clear cart
+//	1. pre-allocate order_id
+//	2. POST inventory/reserve  (409 passthrough)
+//	3. persist order (status "confirmed") + emit order.created
 //
-// Trace headers are forwarded on every downstream hop so the whole checkout is
-// one trace.
+// Trace headers are forwarded on the inventory hop so the checkout is one trace.
 func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	log := loggerFrom(r.Context())
 	in, ok := decodeCreateOrder(w, r)
@@ -67,20 +64,11 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), orchestrateTimeout)
 	defer cancel()
 
-	// 1. Source the authoritative cart. Empty cart -> 400.
-	cart, err := h.cart.GetCart(ctx, in.UserID, headers)
-	if errors.Is(err, ErrCartEmpty) {
-		writeError(w, http.StatusBadRequest, "cart is empty")
-		return
-	}
-	if err != nil {
-		log.Error("get cart failed", "error", err, "user_id", in.UserID)
-		writeError(w, http.StatusBadGateway, "cart service unavailable")
-		return
-	}
+	// Total is computed from the submitted line items.
+	total := orderTotal(in.Items)
 
-	// 2. Pre-allocate the order id from the sequence so payment + inventory +
-	// the persisted row + the Kafka key all agree on it (see store.NextID).
+	// 1. Pre-allocate the order id from the sequence so inventory, the persisted
+	// row, and the Kafka key all agree on it (see store.NextID).
 	idCtx, idCancel := context.WithTimeout(ctx, dbTimeout)
 	orderID, err := h.store.NextID(idCtx)
 	idCancel()
@@ -90,28 +78,10 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Charge payment with the pre-allocated id. Declines are a normal business
-	// outcome -> 402, not a 5xx.
-	_, err = h.payment.Charge(ctx, PaymentRequest{
-		OrderID:     orderID,
-		UserID:      in.UserID,
-		AmountCents: cart.TotalCents,
-	}, headers)
-	if errors.Is(err, ErrPaymentDeclined) {
-		log.Info("payment declined", "order_id", orderID, "user_id", in.UserID)
-		writeError(w, http.StatusPaymentRequired, "payment declined")
-		return
-	}
-	if err != nil {
-		log.Error("payment failed", "error", err, "order_id", orderID)
-		writeError(w, http.StatusBadGateway, "payment service unavailable")
-		return
-	}
-
-	// 3. Reserve inventory (all-or-none). 409 passes straight through.
+	// 2. Reserve inventory (all-or-none). 409 passes straight through.
 	if err := h.inventory.Reserve(ctx, ReserveRequest{
 		OrderID: orderID,
-		Items:   reserveItems(cart.Items),
+		Items:   reserveItems(in.Items),
 	}, headers); err != nil {
 		if errors.Is(err, ErrInsufficientStock) {
 			log.Info("inventory reservation rejected", "order_id", orderID)
@@ -123,12 +93,12 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Persist the confirmed order, then emit order.created.
+	// 3. Persist the confirmed order, then emit order.created.
 	order := Order{
 		ID:         orderID,
 		UserID:     in.UserID,
-		Items:      cart.Items,
-		TotalCents: cart.TotalCents,
+		Items:      in.Items,
+		TotalCents: total,
 		Status:     "confirmed",
 		CreatedAt:  time.Now().UTC(),
 	}
@@ -141,10 +111,10 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Emit the event. Payment is captured and inventory reserved, so the order
-	// IS confirmed even if the broker hiccups; we log the emit failure loudly
-	// (it'd leave downstream consumers out of sync — a known at-least-once gap a
-	// real system would close with a transactional outbox) but still return 201.
+	// Emit the event. Inventory is reserved, so the order IS confirmed even if the
+	// broker hiccups; we log the emit failure loudly (it'd leave downstream
+	// consumers out of sync — a known at-least-once gap a real system would close
+	// with a transactional outbox) but still return 201.
 	if err := h.producer.Emit(ctx, OrderCreatedEvent{
 		Event:      "order.created",
 		OrderID:    order.ID,
@@ -154,11 +124,6 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:  order.CreatedAt,
 	}); err != nil {
 		log.Error("emit order.created failed", "error", err, "order_id", order.ID)
-	}
-
-	// 5. Best-effort cart clear — never fail the order over this.
-	if err := h.cart.ClearCart(ctx, in.UserID, headers); err != nil {
-		log.Warn("cart clear failed (best-effort)", "error", err, "user_id", in.UserID)
 	}
 
 	log.Info("order created", "order_id", order.ID, "user_id", order.UserID, "total_cents", order.TotalCents)
@@ -231,7 +196,16 @@ func (h *Handler) readyz(w http.ResponseWriter, r *http.Request) {
 
 // --- helpers ---
 
-// reserveItems projects cart lines into the inventory reservation shape.
+// orderTotal sums the submitted line items (price_cents * quantity).
+func orderTotal(items []OrderItem) int64 {
+	var total int64
+	for _, it := range items {
+		total += it.PriceCents * int64(it.Quantity)
+	}
+	return total
+}
+
+// reserveItems projects order lines into the inventory reservation shape.
 func reserveItems(items []OrderItem) []ReserveItem {
 	out := make([]ReserveItem, 0, len(items))
 	for _, it := range items {

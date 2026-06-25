@@ -62,11 +62,13 @@ func (s *Store) Close() { s.pool.Close() }
 // Ping checks database connectivity; used by the readiness probe.
 func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
-// Migrate creates the credentials table if it does not exist.
+// Migrate creates the credentials table if it does not exist. In the trimmed
+// build there is no separate user service, so auth mints the user_id itself
+// (BIGSERIAL) instead of receiving it from the user service.
 func (s *Store) Migrate(ctx context.Context) error {
 	_, err := s.pool.Exec(ctx, `
 CREATE TABLE IF NOT EXISTS credentials (
-    user_id       BIGINT PRIMARY KEY,
+    user_id       BIGSERIAL PRIMARY KEY,
     email         TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -74,18 +76,20 @@ CREATE TABLE IF NOT EXISTS credentials (
 	return err
 }
 
-// CreateCredential stores a new login identity. A duplicate email surfaces as
-// ErrConflict so the handler can return 409.
-func (s *Store) CreateCredential(ctx context.Context, userID int64, email, passwordHash string) error {
-	_, err := s.pool.Exec(ctx,
-		`INSERT INTO credentials (user_id, email, password_hash) VALUES ($1, $2, $3)`,
-		userID, email, passwordHash)
+// CreateCredential stores a new login identity, generating the user_id, and
+// returns it. A duplicate email surfaces as ErrConflict so the handler can
+// return 409.
+func (s *Store) CreateCredential(ctx context.Context, email, passwordHash string) (int64, error) {
+	var userID int64
+	err := s.pool.QueryRow(ctx,
+		`INSERT INTO credentials (email, password_hash) VALUES ($1, $2) RETURNING user_id`,
+		email, passwordHash).Scan(&userID)
 
 	var pgErr *pgconn.PgError
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
-		return ErrConflict
+		return 0, ErrConflict
 	}
-	return err
+	return userID, err
 }
 
 // GetByEmail looks up the stored credential for a login attempt.

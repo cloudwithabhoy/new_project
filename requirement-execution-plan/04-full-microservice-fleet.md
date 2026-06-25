@@ -1,7 +1,7 @@
 # Phase 04 — Deploy the full microservice fleet + async backbone
 
 ## Goal
-The whole application goes live: all 12 microservices plus `thumbnail-job` running in the cluster
+The whole application goes live: all 6 microservices running in the cluster
 (pre-mesh, ALB ingress), with the Kafka event backbone wired up.
 
 ## Why this phase
@@ -11,7 +11,7 @@ the later phases (mesh, scaling, observability, resilience) need a real running 
 - **Unlocks:** Phase 05+ (a real app to mesh, scale, observe, and break).
 
 ## Scope
-**In scope:** the remaining 11 services deployed with the 5-object recipe from 3.2; service-to-service
+**In scope:** the remaining 5 services deployed with the 5-object recipe from 3.2; service-to-service
 discovery via cluster DNS `*_URL` env vars; `auth`'s shared `JWT_PRIVATE_KEY_PEM` Secret; the Kafka
 backbone (`order` producing `order.created`, consumed by inventory / notification / recommendation);
 `thumbnail-job` as a Job; default-deny NetworkPolicy opened to the exact call graph; ALB Ingress →
@@ -20,7 +20,7 @@ api-gateway + frontend.
 KEDA-driven scaling of `thumbnail-job` (later).
 
 ## What it needs to do
-- All 12 microservices plus `thumbnail-job` run in the cluster behind ALB ingress (pre-mesh).
+- All 6 microservices run in the cluster behind ALB ingress (pre-mesh).
 - Services find each other via cluster DNS using `*_URL` env vars — no hardcoded addresses.
 - `auth` signs tokens from one shared `JWT_PRIVATE_KEY_PEM` Secret.
 - `order` produces `order.created`; `inventory`, `notification`, and `recommendation` consume it, so order
@@ -33,7 +33,7 @@ KEDA-driven scaling of `thumbnail-job` (later).
 ## Architecture
 
 ```
-   users ─► ALB Ingress ─► api-gateway ─► [ 12 microservices ] ─► datastores   (NEW: full fleet)
+   users ─► ALB Ingress ─► api-gateway ─► [ 6 microservices ] ─► datastores   (NEW: full fleet)
                                               │
                        order ─► Kafka(order.created) ─► inventory · notification · recommendation
                                                                           (NEW: async backbone)
@@ -45,14 +45,14 @@ event fan-out — behind an ALB.
 ## Done when
 - A full checkout works end-to-end through the running app.
 - Placing an order fans out `order.created` to inventory, notification, and recommendation.
-- All 12 services plus `thumbnail-job` are running behind ALB ingress.
+- All 6 services are running behind ALB ingress.
 - Only the exact call-graph edges are allowed; all other east-west traffic is denied.
 
 ## How to build it
 The exact commands, manifests, verify steps, and concept deep-dives live in the runbook — broken into
 small parts:
 - [`step-by-step-implementation/4.1-deploy-the-fleet.md`](../step-by-step-implementation/4.1-deploy-the-fleet.md) —
-  deploy the remaining 11 services with the 5-object recipe from 3.2; service-to-service discovery via
+  deploy the remaining 5 services with the 5-object recipe from 3.2; service-to-service discovery via
   cluster DNS `*_URL` env vars; `auth`'s one shared `JWT_PRIVATE_KEY_PEM` Secret. *(deep-dive: Service DNS → ClusterIP → kube-proxy)*
 - [`step-by-step-implementation/4.2-kafka-async-backbone.md`](../step-by-step-implementation/4.2-kafka-async-backbone.md) —
   `order` produces `order.created`; `inventory` / `notification` / `recommendation` consume it; `thumbnail-job` as a Job. *(deep-dive: sync vs async events)*

@@ -23,7 +23,7 @@ third region (Phase 21).
 
 ## What it needs to do
 - A second region (London / `eu-west-2`) runs the entire single-region stack on its own: own ALB, EKS
-  cluster, Istio gateway, all 12 services, and datastores (Postgres ×7, Redis, ES, Kafka).
+  cluster, Istio gateway, all 6 services, and datastores (Postgres ×4, Redis, ES, Kafka).
 - A global router gives one DNS name and picks a region per user by latency (or by geography).
 - Each region has its own health checks.
 - An unhealthy region drops out of the routing answers, so its users re-route to the next-nearest healthy
@@ -51,7 +51,7 @@ third region (Phase 21).
  │   ├─ auth · user · catalog · search      │   │   ├─ auth · user · catalog · search
  │   ├─ cart · order · payment · inventory  │   │   ├─ cart · order · payment · inventory
  │   └─ notification · recommendation · ui  │   │   └─ notification · recommendation · ui
- │  data: Postgres ×7 · Redis · ES · Kafka  │   │  data: Postgres ×7 · Redis · ES · Kafka
+ │  data: Postgres ×4 · Redis · ES · Kafka  │   │  data: Postgres ×4 · Redis · ES · Kafka
  │  multi-AZ · autoscaling · observability  │   │  multi-AZ · autoscaling · observability
  └──────────────────────────────────────────┘   └─────────────────────────────────────────
         full single-region stack, autonomous                 an independent copy of the same stack

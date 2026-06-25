@@ -41,13 +41,9 @@ type routeSpec struct {
 // {USER_URL}/users/123 (the trailing path after the prefix is preserved verbatim).
 func NewRouter(cfg Config, verifier *Verifier) (*Router, error) {
 	specs := []routeSpec{
-		{"/api/auth", cfg.AuthURL, false},                      // public
-		{"/api/users", cfg.UserURL, false},                     // public
-		{"/api/products", cfg.CatalogURL, false},               // public
-		{"/api/search", cfg.SearchURL, false},                  // public
-		{"/api/cart", cfg.CartURL, true},                       // PROTECTED
-		{"/api/orders", cfg.OrderURL, true},                    // PROTECTED
-		{"/api/recommendations", cfg.RecommendationURL, false}, // public
+		{"/api/auth", cfg.AuthURL, false},        // public
+		{"/api/products", cfg.CatalogURL, false}, // public (catalog)
+		{"/api/orders", cfg.OrderURL, true},      // PROTECTED
 	}
 
 	rt := &Router{verifier: verifier}

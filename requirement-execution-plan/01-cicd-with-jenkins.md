@@ -12,7 +12,7 @@ ECR. So this comes first.
 
 ## Scope
 **In scope:** the ECR repo `ecom-repo`; Jenkins with one path-triggered pipeline per service
-(`docker build → tag <svc>-<sha> → push to ECR`); a one-time run of all 13 services so every image lands
+(`docker build → tag <svc>-<sha> → push to ECR`); a one-time run of all 6 services so every image lands
 in ECR.
 **Out of scope:** the EKS cluster and any deploy (Phase 02+); automated deploy — deploying stays manual via
 `kubectl` throughout.
@@ -22,7 +22,7 @@ in ECR.
 - Jenkins runs one path-triggered pipeline per service, generated from the Job DSL seed
   ([`../.ci/jobs.groovy`](../.ci/jobs.groovy)).
 - Each pipeline runs `lint · test · build`, then `docker build → tag <svc>-<sha> → push to ECR`.
-- All 13 services are built and pushed at least once, so every image is in ECR.
+- All 6 services are built and pushed at least once, so every image is in ECR.
 - Every image is tagged by its git SHA (`<svc>-<sha>`), so you can trace it back to the commit.
 - The pipeline is re-runnable and works the same for any service.
 - Pushes use the AWS credential configured in Jenkins — no long-lived keys in source.
@@ -41,7 +41,7 @@ immutable git SHA. Nothing is deployed yet; that's the next phases.
 
 ## Done when
 - Pushing a commit auto-builds and pushes that service's image to ECR, tagged by SHA.
-- The pipeline re-runs and works for any of the 13 services.
+- The pipeline re-runs and works for any of the 6 services.
 - All 13 images are present in ECR after the one-time run.
 - CI doesn't run `kubectl` — deploying stays manual.
 
@@ -55,7 +55,7 @@ kubectl / eksctl tooling — lives in the runbook, broken into small parts:
 
 In short: create the **ECR** repo `ecom-repo`; stand up **Jenkins** with one **path-triggered** pipeline
 per service (generated from the **Job DSL seed** [`../.ci/jobs.groovy`](../.ci/jobs.groovy)) that runs
-`docker build → tag <svc>-<sha> → push to ECR`; run all 13 once so every image is in ECR. **Deploy stays
+`docker build → tag <svc>-<sha> → push to ECR`; run all 6 once so every image is in ECR. **Deploy stays
 manual** — CI never runs `kubectl`.
 
 ---

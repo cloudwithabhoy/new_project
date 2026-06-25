@@ -26,17 +26,26 @@ type Order struct {
 	CreatedAt  time.Time   `json:"created_at"`
 }
 
-// CreateOrderInput is the client payload for POST /orders. The orchestrator only
-// needs the user id — the cart contents, totals, and pricing are sourced
-// authoritatively from the cart service, never trusted from the client.
+// CreateOrderInput is the client payload for POST /orders. In the trimmed build
+// there is no cart service, so the client submits the line items directly; the
+// order total is computed server-side from them.
 type CreateOrderInput struct {
-	UserID int64 `json:"user_id"`
+	UserID int64       `json:"user_id"`
+	Items  []OrderItem `json:"items"`
 }
 
-// Validate enforces the minimal rule: a positive user id.
+// Validate enforces: a positive user id and at least one valid line item.
 func (in CreateOrderInput) Validate() error {
 	if in.UserID <= 0 {
 		return errors.New("user_id is required")
+	}
+	if len(in.Items) == 0 {
+		return errors.New("items is required (at least one line)")
+	}
+	for _, it := range in.Items {
+		if it.ProductID <= 0 || it.Quantity <= 0 {
+			return errors.New("each item needs a positive product_id and quantity")
+		}
 	}
 	return nil
 }

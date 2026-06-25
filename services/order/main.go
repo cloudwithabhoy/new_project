@@ -30,9 +30,7 @@ func main() {
 	}
 
 	// Downstream clients for the orchestration fan-out. No addresses hardcoded —
-	// the URLs come from ConfigMap so Istio/Kubernetes owns the wiring.
-	cart := NewCartClient(cfg.CartURL)
-	payment := NewPaymentClient(cfg.PaymentURL)
+	// the URL comes from ConfigMap so Istio/Kubernetes owns the wiring.
 	inventory := NewInventoryClient(cfg.InventoryURL)
 
 	// Kafka producer for order.created. The writer dials lazily, so this never
@@ -46,7 +44,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      NewRouter(store, cart, payment, inventory, producer),
+		Handler:      NewRouter(store, inventory, producer),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second, // orchestration fan-out can take longer than a simple read
 		IdleTimeout:  60 * time.Second,
@@ -56,8 +54,6 @@ func main() {
 	go func() {
 		slog.Info("order service starting",
 			"port", cfg.Port,
-			"cart_url", cfg.CartURL,
-			"payment_url", cfg.PaymentURL,
 			"inventory_url", cfg.InventoryURL,
 			"kafka_topic", cfg.KafkaTopic,
 		)

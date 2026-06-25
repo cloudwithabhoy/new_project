@@ -13,7 +13,7 @@ The services are stateful, so the data layer has to exist first — and you prov
 ## Scope
 **In scope:** the datastores as StatefulSets (Postgres-per-service, Redis, Elasticsearch, Kafka) on `gp3`
 storage; the `catalog` service wired to its own database and exposed through the ALB.
-**Out of scope:** the other 11 services + the Kafka backbone (Phase 04); mesh, autoscaling, observability
+**Out of scope:** the other 5 services + the Kafka backbone (Phase 04); mesh, autoscaling, observability
 (Phases 05–07); cross-region replication (Phase 10).
 
 ## What it needs to do

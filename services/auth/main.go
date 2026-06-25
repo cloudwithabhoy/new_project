@@ -38,11 +38,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	users := NewUserClient(cfg.UserServiceURL)
-
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      NewRouter(store, signer, users),
+		Handler:      NewRouter(store, signer),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -50,7 +48,7 @@ func main() {
 
 	// Run the server in a goroutine so main can wait for shutdown signals.
 	go func() {
-		slog.Info("auth service starting", "port", cfg.Port, "user_url", cfg.UserServiceURL)
+		slog.Info("auth service starting", "port", cfg.Port)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("server error", "error", err)
 			os.Exit(1)

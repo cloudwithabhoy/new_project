@@ -15,13 +15,9 @@ type Config struct {
 
 	// Upstream base URLs. The gateway reverse-proxies to these by path prefix.
 	// No address is hardcoded — Kubernetes/Istio owns the wiring via ConfigMap.
-	AuthURL           string
-	UserURL           string
-	CatalogURL        string
-	SearchURL         string
-	CartURL           string
-	OrderURL          string
-	RecommendationURL string
+	AuthURL    string
+	CatalogURL string
+	OrderURL   string
 
 	// JWT verification configuration. The gateway validates RS256 tokens minted
 	// by auth, checking these claims. JWKS is fetched from {AuthURL}.
@@ -33,17 +29,13 @@ type Config struct {
 // local-development defaults when a variable is not set.
 func LoadConfig() Config {
 	return Config{
-		Port:              getenv("PORT", "8080"),
-		LogLevel:          getenv("LOG_LEVEL", "info"),
-		AuthURL:           getenv("AUTH_URL", "http://localhost:8081"),
-		UserURL:           getenv("USER_URL", "http://localhost:8082"),
-		CatalogURL:        getenv("CATALOG_URL", "http://localhost:8083"),
-		SearchURL:         getenv("SEARCH_URL", "http://localhost:8084"),
-		CartURL:           getenv("CART_URL", "http://localhost:8085"),
-		OrderURL:          getenv("ORDER_URL", "http://localhost:8086"),
-		RecommendationURL: getenv("RECOMMENDATION_URL", "http://localhost:8090"),
-		JWTIssuer:         getenv("JWT_ISSUER", "auth.ecommerce.local"),
-		JWTAudience:       getenv("JWT_AUDIENCE", "ecommerce"),
+		Port:        getenv("PORT", "8080"),
+		LogLevel:    getenv("LOG_LEVEL", "info"),
+		AuthURL:     getenv("AUTH_URL", "http://localhost:8081"),
+		CatalogURL:  getenv("CATALOG_URL", "http://localhost:8083"),
+		OrderURL:    getenv("ORDER_URL", "http://localhost:8086"),
+		JWTIssuer:   getenv("JWT_ISSUER", "auth.ecommerce.local"),
+		JWTAudience: getenv("JWT_AUDIENCE", "ecommerce"),
 	}
 }
 

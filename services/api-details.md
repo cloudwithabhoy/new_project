@@ -57,15 +57,9 @@ Reference implementations to copy style from:
 |---|---|---|---|---|
 | api-gateway | Go | 8080 | (edge) | — |
 | auth | Go | 8081 | `http://auth:8081` (`AUTH_URL`) | Postgres |
-| user | Python | 8082 | `http://user:8082` (`USER_URL`) | Postgres |
 | catalog | Go | 8083 | `http://catalog:8083` (`CATALOG_URL`) | Postgres |
-| search | Python | 8084 | `http://search:8084` (`SEARCH_URL`) | Elasticsearch |
-| cart | Go | 8085 | `http://cart:8085` (`CART_URL`) | Redis |
 | order | Go | 8086 | `http://order:8086` (`ORDER_URL`) | Postgres |
-| payment | Go | 8087 | `http://payment:8087` (`PAYMENT_URL`) | Postgres |
 | inventory | Python | 8088 | `http://inventory:8088` (`INVENTORY_URL`) | Postgres |
-| notification | Python | 8089 | (async only) | — |
-| recommendation | Python | 8090 | `http://recommendation:8090` (`RECOMMENDATION_URL`) | Postgres |
 | frontend | Node | 3000 | (edge UI) | — |
 
 **Kafka:** brokers via `KAFKA_BROKERS` (e.g. `kafka:9092`). Consumers set `KAFKA_GROUP`.
@@ -82,28 +76,6 @@ Reference implementations to copy style from:
 `POST /register` · `POST /login` → `{access_token, token_type, expires_in}` · `GET /validate` ·
 `GET /.well-known/jwks.json`. JWT claims: `iss,aud,sub(=user_id),email,iat,exp`, RS256, `kid` header.
 
-### user (built) — `:8082`
-`POST /users {email, full_name}` → 201 `User` · `GET /users/{id}` · `GET /users` ·
-`PUT /users/{id}` · `GET /users/by-email?email=`. `User = {id,email,full_name,created_at,updated_at}`
-
-### cart — `:8085` (Redis), calls **catalog**
-- `GET /carts/{user_id}` → `Cart`
-- `POST /carts/{user_id}/items {product_id, quantity}` → 200 `Cart`
-  - Validates product via `GET {CATALOG_URL}/products/{product_id}` (404 → 404 "product not found").
-  - Snapshots `name` + `price_cents` from catalog into the cart line.
-- `DELETE /carts/{user_id}/items/{product_id}` → 200 `Cart`
-- `DELETE /carts/{user_id}` → 204 (clear)
-- `Cart = {user_id, items:[{product_id, name, price_cents, quantity}], total_cents}`
-- Redis key: `cart:{user_id}` storing the JSON cart. `INVENTORY`-agnostic.
-
-### payment — `:8087` (Postgres), **fault target**
-- `POST /payments {order_id, user_id, amount_cents}` → 201 `Payment`
-  - Mock authorizer: **approve** by default. Env `FAIL_MODE` (`off|decline|error`) forces declines
-    (`status:"declined"`, still 201) or `error` (500) — a deterministic hook for chaos/fault demos
-    alongside Istio fault injection.
-- `GET /payments/{id}` → `Payment`
-- `Payment = {id, order_id, user_id, amount_cents, status:"approved"|"declined", created_at}`
-
 ### inventory — `:8088` (Postgres), sync **and** async
 - `GET /inventory/{product_id}` → `{product_id, available, reserved}` (404 if unseeded)
 - `PUT /inventory/{product_id} {available}` → set/seed stock (so you can populate it)
@@ -112,67 +84,38 @@ Reference implementations to copy style from:
   - **Idempotent by `order_id`** (re-reserving the same order is a no-op success).
 - **Async:** consumes `order.created` → commits the reservation (reserved → sold); idempotent by order_id.
 
-### order — `:8086` (Postgres), **orchestrator**, calls cart/payment/inventory + emits Kafka
-- `POST /orders {user_id}` → 201 `Order`
-  1. `GET {CART_URL}/carts/{user_id}` — 400 if empty cart.
-  2. `POST {PAYMENT_URL}/payments {order_id(generated), user_id, amount_cents}` — declined → 402 `{error:"payment declined"}`.
-  3. `POST {INVENTORY_URL}/inventory/reserve {order_id, items}` — 409 → 409 passthrough.
-  4. Persist order (`status:"confirmed"`), **emit `order.created`** to Kafka.
-  5. `DELETE {CART_URL}/carts/{user_id}` (best-effort clear).
+### order — `:8086` (Postgres), **orchestrator**, calls inventory + emits Kafka
+- `POST /orders {user_id, items:[{product_id, name, price_cents, quantity}]}` → 201 `Order`
+  - *Trimmed build:* the client submits the line items directly (no cart/payment service); the total is computed server-side.
+  1. Pre-allocate `order_id`; compute `total_cents` from the items.
+  2. `POST {INVENTORY_URL}/inventory/reserve {order_id, items}` — 409 → 409 passthrough.
+  3. Persist order (`status:"confirmed"`), **emit `order.created`** to Kafka.
 - `GET /orders/{id}` → `Order` · `GET /orders?user_id=` → `[Order]`
 - `Order = {id, user_id, items:[{product_id, name, price_cents, quantity}], total_cents, status, created_at}`
 
-### search — `:8084` (Elasticsearch), calls **catalog**
-- `GET /search?q=&limit=` → `{query, hits:[Product-ish], total}` (queries the ES index)
-- `POST /reindex` → pulls all products from `GET {CATALOG_URL}/products` and bulk-indexes them; returns `{indexed: n}`
-- Index name `products`. Readiness depends on Elasticsearch reachable.
-
-### recommendation — `:8090` (Postgres), async + sync
-- `GET /recommendations?user_id=` or `?product_id=` → `{variant, product_ids:[...]}`
-- **A/B:** env `VARIANT` (`a|b`) changes the ranking strategy; include it in the response + a
-  `recommendation_requests_total{variant}` metric.
-- **Async:** consumes `order.created` → increments co-purchase / popularity counts used by the rankings.
-
-### notification — `:8089` (no DB), async only (+ ops endpoints)
-- Consumes `order.created` → "sends" a notification (structured log line; no real email).
-- `GET /notifications?limit=` → last N notifications from an in-memory ring buffer (for demo/inspection).
-- Readiness depends on the Kafka consumer being connected.
-
-### api-gateway — `:8080`, edge router (reverse proxy) to everything
+### api-gateway — `:8080`, edge router (reverse proxy)
 - Path → upstream:
-  - `/api/auth/*` → `AUTH_URL` (strip `/api/auth`)
-  - `/api/users/*` → `USER_URL` (strip `/api/users` → `/users...`)
-  - `/api/products/*` → `CATALOG_URL`
-  - `/api/search/*` → `SEARCH_URL`
-  - `/api/cart/*` → `CART_URL` (→ `/carts...`)
-  - `/api/orders/*` → `ORDER_URL`
-  - `/api/recommendations/*` → `RECOMMENDATION_URL`
-- **AuthN:** for protected prefixes (`/api/cart`, `/api/orders`), require `Authorization: Bearer`,
-  verify the JWT against auth's JWKS (`GET {AUTH_URL}/.well-known/jwks.json`, cache it), reject 401
-  if invalid, and inject `X-User-Id: <sub>` to the upstream. Public: `/api/auth/*`, `/api/products/*`, `/api/search/*`.
+  - `/api/auth/*` → `AUTH_URL` (strip `/api/auth`) — public
+  - `/api/products/*` → `CATALOG_URL` — public
+  - `/api/orders/*` → `ORDER_URL` — **protected**
+- **AuthN:** for the protected prefix (`/api/orders`), require `Authorization: Bearer`, verify the JWT
+  against auth's JWKS (`GET {AUTH_URL}/.well-known/jwks.json`, cache it), reject 401 if invalid, and
+  inject `X-User-Id: <sub>` to the upstream. Public: `/api/auth/*`, `/api/products/*`.
 - Use `net/http/httputil.ReverseProxy`; preserve/forward trace headers (proxy passes them through).
 - `GET /healthz` · `GET /readyz` (200 if it can reach auth's JWKS) · `GET /metrics`.
 
 ### frontend — `:3000` (Node/Express)
 - Serves a tiny single-page UI (static HTML+JS) that calls the gateway: register/login, browse
-  products, add to cart, checkout, view orders. Keep it minimal but functional.
+  products, place an order (submit line items), view orders. Keep it minimal but functional.
 - Runtime config: `GET /config` returns `{apiGatewayUrl}` from `API_GATEWAY_URL` env so the page
   isn't built with a hardcoded backend (browser hits the gateway directly).
 - `GET /healthz` · `GET /readyz` · `GET /metrics` (prom-client default + a page-view counter).
-
-### thumbnail-job — worker (Python), KEDA-driven, **no HTTP server required**
-- Consumes Kafka topic `thumbnail.requests` (`KAFKA_GROUP=thumbnail`), "processes" each image
-  (simulate work: read `{product_id, image_url}`, sleep ~200ms, log result). Idempotent.
-- Exposes a tiny metrics endpoint on `:9100` (`thumbnails_processed_total`) OR pushes nothing —
-  prefer a minimal HTTP `/metrics` + `/healthz` on `:9100` so KEDA/Prometheus can see it.
-- Designed for **KEDA scale-to-zero** on Kafka lag. Include a `producer.py` helper to enqueue test
-  messages, and document the ScaledObject trigger (kafka lag) in the README for the DevOps side.
 
 ---
 
 ## 4. Kafka event schemas
 
-**Topic `order.created`** (emitted by `order`; consumed by `inventory`, `notification`, `recommendation`):
+**Topic `order.created`** (emitted by `order`; consumed by `inventory`):
 ```json
 {
   "event": "order.created",
@@ -183,33 +126,18 @@ Reference implementations to copy style from:
   "created_at": "2026-06-16T12:00:00Z"
 }
 ```
-- Key = `order_id` (string). Consumers must be **idempotent by `order_id`**.
+- Key = `order_id` (string). The consumer must be **idempotent by `order_id`**.
 - JSON, UTF-8. Producers set the key so partitioning is stable.
-
-**Topic `thumbnail.requests`** (consumed by `thumbnail-job`):
-```json
-{ "product_id": 7, "image_url": "https://example/img/7.jpg" }
-```
 
 ---
 
 ## 5. Cross-microservice call map (for your Istio routing & NetworkPolicies)
 
 ```
-frontend ─→ api-gateway ─┬─→ auth ─→ user
-                         ├─→ user
+frontend ─→ api-gateway ─┬─→ auth
                          ├─→ catalog
-                         ├─→ search ─→ catalog
-                         ├─→ cart ─→ catalog
-                         ├─→ order ─→ cart
-                         │           ─→ payment
-                         │           ─→ inventory
-                         │           ─→ Kafka(order.created)
-                         └─→ recommendation
+                         └─→ order ─→ inventory
+                                    ─→ Kafka(order.created)
 
-Kafka(order.created) ─→ inventory (commit)
-                     ─→ notification (notify)
-                     ─→ recommendation (rank)
-
-Kafka(thumbnail.requests) ─→ thumbnail-job
+Kafka(order.created) ─→ inventory (commit reservation)
 ```
