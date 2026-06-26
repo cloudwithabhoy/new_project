@@ -31,19 +31,22 @@ type Router struct {
 // routeSpec is the static prefix->upstream wiring. Order matters only for
 // readability; prefixes are mutually exclusive. protected prefixes require auth.
 type routeSpec struct {
-	prefix    string
+	prefix    string // path prefix used to MATCH and as the metrics label
+	strip     string // leading path removed before forwarding upstream
 	rawURL    string
 	protected bool
 }
 
-// NewRouter builds the gateway router from config. Each entry strips its /api/<x>
-// prefix so e.g. /api/cart/carts/5 -> {CART_URL}/carts/5 and /api/users/123 ->
-// {USER_URL}/users/123 (the trailing path after the prefix is preserved verbatim).
+// NewRouter builds the gateway router from config. Each route strips a leading
+// path before forwarding: auth serves resource-less paths (/login, /register), so
+// its whole /api/auth prefix is stripped (/api/auth/login -> {AUTH_URL}/login);
+// catalog and order serve /products and /orders, so only /api is stripped to keep
+// the resource segment (/api/products -> {CATALOG_URL}/products).
 func NewRouter(cfg Config, verifier *Verifier) (*Router, error) {
 	specs := []routeSpec{
-		{"/api/auth", cfg.AuthURL, false},        // public
-		{"/api/products", cfg.CatalogURL, false}, // public (catalog)
-		{"/api/orders", cfg.OrderURL, true},      // PROTECTED
+		{"/api/auth", "/api/auth", cfg.AuthURL, false},   // public; strip /api/auth -> /login,/register
+		{"/api/products", "/api", cfg.CatalogURL, false}, // public; strip /api -> /products
+		{"/api/orders", "/api", cfg.OrderURL, true},      // PROTECTED; strip /api -> /orders
 	}
 
 	rt := &Router{verifier: verifier}
@@ -55,7 +58,7 @@ func NewRouter(cfg Config, verifier *Verifier) (*Router, error) {
 		rt.routes = append(rt.routes, route{
 			prefix:    s.prefix,
 			target:    target,
-			proxy:     newReverseProxy(s.prefix, target),
+			proxy:     newReverseProxy(s.strip, target),
 			protected: s.protected,
 		})
 	}
@@ -66,7 +69,7 @@ func NewRouter(cfg Config, verifier *Verifier) (*Router, error) {
 // the gateway prefix from the request path. httputil.ReverseProxy copies the
 // incoming headers to the upstream by default, so the W3C/B3 trace-context
 // headers propagate automatically — we must only avoid clobbering them.
-func newReverseProxy(prefix string, target *url.URL) *httputil.ReverseProxy {
+func newReverseProxy(strip string, target *url.URL) *httputil.ReverseProxy {
 	p := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			// Route to the upstream host.
@@ -74,9 +77,9 @@ func newReverseProxy(prefix string, target *url.URL) *httputil.ReverseProxy {
 			req.URL.Host = target.Host
 			req.Host = target.Host
 
-			// Strip the /api/<x> prefix. /api/cart/carts/5 -> /carts/5 ;
-			// /api/users/123 -> /users/123 ; /api/orders -> "" -> "/".
-			rest := strings.TrimPrefix(req.URL.Path, prefix)
+			// Strip the configured leading path. /api/products -> /products ;
+			// /api/orders/5 -> /orders/5 ; /api/auth/login -> /login.
+			rest := strings.TrimPrefix(req.URL.Path, strip)
 			if rest == "" {
 				rest = "/"
 			}
