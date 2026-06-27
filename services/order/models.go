@@ -5,9 +5,9 @@ import (
 	"time"
 )
 
-// OrderItem is a single line in an order. It mirrors the cart line shape
-// (product_id, name, price_cents, quantity) so the cart snapshot carries
-// straight through into the persisted order.
+// OrderItem is a single line in an order: product_id, name, price_cents,
+// quantity. In the trimmed build the client submits these directly (no cart
+// service), and they carry straight through into the persisted order.
 type OrderItem struct {
 	ProductID  int64  `json:"product_id"`
 	Name       string `json:"name"`

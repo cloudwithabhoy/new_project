@@ -10,8 +10,8 @@ import (
 )
 
 // OrderCreatedEvent is the `order.created` payload (§4). It is consumed by
-// inventory (commit reservation), notification (notify), and recommendation
-// (rank). Consumers must be idempotent by order_id.
+// inventory to commit the reservation (reserved → sold). Consumers must be
+// idempotent by order_id (the event is delivered at-least-once).
 type OrderCreatedEvent struct {
 	Event      string      `json:"event"` // always "order.created"
 	OrderID    int64       `json:"order_id"`

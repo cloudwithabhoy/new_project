@@ -58,7 +58,7 @@ Prerequisites · Execution steps / What you build · Exit check · Interview one
 | **CI/CD** | Jenkins builds + pushes to ECR; **deploy stays manual** |
 | **Topology** | multi-region active-active — 3 regions, global geo-routing, **independent regional stacks** (Istio inside each region, not stretched) |
 | **Data** | **single-write-primary** + cross-region read replicas (active-active reads; not multi-master writes) |
-| **Datastores** | in-cluster **StatefulSets** (Postgres/Redis/ES/Kafka) — hand-wired, not operators |
+| **Datastores** | in-cluster **StatefulSets** (Postgres/Kafka) — hand-wired, not operators |
 | **Reliability & chaos** | in scope (HPA/VPA/KEDA/Karpenter/PDB/Velero/Chaos Mesh) |
 | **Observability & SLOs** | in scope (Prometheus + Thanos, Grafana, Loki, Tempo, OTel) |
 | **Security & supply chain** | deferred add-on (OPA/Kyverno, Trivy/Cosign, Vault/External Secrets, cert-manager) |
@@ -67,7 +67,7 @@ Prerequisites · Execution steps / What you build · Exit check · Interview one
 
 ## Tech stack & components
 
-**Stack:** Go + Python + Node services · Postgres / Redis / Elasticsearch / Kafka · Istio · AWS EKS ·
+**Stack:** Go + Python + Node services · Postgres / Kafka · Istio · AWS EKS ·
 Amazon ECR · Karpenter · Jenkins · Prometheus/Thanos/Grafana/Loki/Tempo.
 
 **6 microservices** (all code-complete): `api-gateway` `auth` `user` `catalog` `search` `cart` `order`

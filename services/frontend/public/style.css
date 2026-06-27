@@ -16,6 +16,12 @@
   box-sizing: border-box;
 }
 
+/* The `hidden` attribute must win over the display rules on .app-view/.auth-view,
+   otherwise the app panel shows before login. */
+[hidden] {
+  display: none !important;
+}
+
 body {
   margin: 0;
   background: var(--bg);

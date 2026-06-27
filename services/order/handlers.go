@@ -60,6 +60,14 @@ func (h *Handler) createOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Trust the gateway-verified identity over the client-supplied body: on the
+	// protected /api/orders route the gateway injects X-User-Id from the JWT
+	// subject (and strips any client value). Use it as the order owner when
+	// present; a direct/un-proxied call falls back to the body's user_id.
+	if uid := userIDFromHeader(r); uid > 0 {
+		in.UserID = uid
+	}
+
 	headers := propagate(r)
 	ctx, cancel := context.WithTimeout(r.Context(), orchestrateTimeout)
 	defer cancel()
@@ -203,6 +211,18 @@ func orderTotal(items []OrderItem) int64 {
 		total += it.PriceCents * int64(it.Quantity)
 	}
 	return total
+}
+
+// userIDFromHeader reads the gateway-injected X-User-Id (the verified JWT
+// subject) and returns it, or 0 if absent/unparseable. The gateway sets this on
+// protected routes after verifying the bearer token and strips any client value,
+// so it's a trustworthy owner id.
+func userIDFromHeader(r *http.Request) int64 {
+	uid, err := strconv.ParseInt(r.Header.Get("X-User-Id"), 10, 64)
+	if err != nil || uid <= 0 {
+		return 0
+	}
+	return uid
 }
 
 // reserveItems projects order lines into the inventory reservation shape.

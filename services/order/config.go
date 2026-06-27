@@ -21,11 +21,9 @@ type Config struct {
 	DBSSLMode  string
 	LogLevel   string
 
-	// Downstream service base URLs (e.g. http://cart:8085). order is the
-	// ORCHESTRATOR — it fans out to cart, payment, and inventory. No address is
-	// hardcoded; you inject these via ConfigMap so Kubernetes/Istio owns the wiring.
-	CartURL      string
-	PaymentURL   string
+	// Downstream service base URL. In the trimmed build order calls only
+	// inventory (reserve stock during checkout); injected via ConfigMap so
+	// Kubernetes/Istio owns the wiring, no address hardcoded.
 	InventoryURL string
 
 	// Kafka producer configuration. order emits `order.created` after persisting.
@@ -45,8 +43,6 @@ func LoadConfig() Config {
 		DBName:       getenv("DB_NAME", "order"),
 		DBSSLMode:    getenv("DB_SSLMODE", "disable"),
 		LogLevel:     getenv("LOG_LEVEL", "info"),
-		CartURL:      getenv("CART_URL", "http://localhost:8085"),
-		PaymentURL:   getenv("PAYMENT_URL", "http://localhost:8087"),
 		InventoryURL: getenv("INVENTORY_URL", "http://localhost:8088"),
 		KafkaBrokers: splitAndTrim(getenv("KAFKA_BROKERS", "localhost:9092")),
 		KafkaTopic:   getenv("KAFKA_TOPIC", "order.created"),
