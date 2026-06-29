@@ -7,11 +7,16 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="brand">Shop<span class="badge">EKS</span></div>
-      <div class="session">
-        <span id="whoami" class="muted">not signed in</span>
-        <button id="logout-btn" class="btn ghost sm" type="button" hidden>Log out</button>
+    <header class="navbar">
+      <div class="nav-inner">
+        <div class="brand">Shop<span class="brand-badge">EKS</span></div>
+        <div class="nav-search" id="nav-search" hidden>
+          <input id="search" type="search" placeholder="Search for products, brands and more…" autocomplete="off" />
+        </div>
+        <div class="nav-account">
+          <span id="whoami" class="nav-user">not signed in</span>
+          <button id="logout-btn" class="btn-light" type="button" hidden>Log out</button>
+        </div>
       </div>
     </header>
 
@@ -41,32 +46,30 @@
           <input id="fullname" type="text" placeholder="Jane Doe" autocomplete="name" />
         </div>
 
-        <button id="submit-btn" class="btn primary block" type="button">Log in</button>
+        <button id="submit-btn" class="btn-primary block" type="button">Log in</button>
       </div>
     </main>
 
-    <!-- APP VIEW — shown after login -->
+    <!-- APP VIEW — the storefront, shown after login -->
     <main id="app-view" class="app-view" hidden>
-      <section class="panel">
-        <div class="panel-head">
+      <section class="section">
+        <div class="section-head">
           <h2>Products</h2>
-          <button id="refresh-products" class="btn ghost sm" type="button">Refresh</button>
+          <button id="refresh-products" class="btn-link" type="button">Refresh</button>
         </div>
         <ul id="products" class="product-grid"></ul>
       </section>
 
-      <section class="panel">
-        <div class="panel-head">
+      <section class="section">
+        <div class="section-head">
           <h2>Your orders</h2>
-          <button id="refresh-orders" class="btn ghost sm" type="button">Refresh</button>
+          <button id="refresh-orders" class="btn-link" type="button">Refresh</button>
         </div>
         <ul id="orders" class="order-list"></ul>
       </section>
     </main>
 
-    <footer class="footer">
-      <small>Gateway: <code id="gateway-url">…</code></small>
-    </footer>
+    <footer class="footer"><small>Gateway: <code id="gateway-url">…</code></small></footer>
 
     <script src="/app.js"></script>
   </body>
